@@ -1,0 +1,1095 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+# AIRLINE PASSENGER SATISFACTION
+
+## Introduction
+
+
+a)  **Specifying the Question**
+
+The main objectives of the study are to explore the factors influencing passenger satisfaction with an airline and to build a model that can predict whether a passenger is generally satisfied or dissatisfied with an airline's services.
+
+b)  **Defining the Metrics for Success**
+
+-   Determining the relationships between overall level of satisfaction and various predictor variables (such as gender, travel class, inflight wifi service, etc).
+    variables in the dataset.
+
+-   Building a model that can predict a passenger’s overall satisfaction with an airline.
+
+-   Identifying the top factors affecting satisfaction with an airline.
+
+
+
+c)  **Understanding the context**
+
+A major key to the success of any business is the satisfaction of its customers. For an airline, having passengers dissatisfied with its services means decreased revenue, as the passengers are unlikely to return to the airline. Additionally, having bad reviews hurts the reputation of an airline, deterring new customers from employing its services. Customer satisfaction is therefore essential in the airline industry. Being able to determine passenger satisfaction levels, as well as the top factors that influence this, will aid airlines in improving their services.
+
+d)  **Recording the Experimental Design**
+
+-   Determine the main objectives.
+
+-   Load and preview the dataset.
+
+-   Understand the data.
+
+-   Prepare the dataset - Identify outliers, anomalies, duplicates,
+    missing values, and determine how deal with them, drop unnecessary
+    columns etc.
+
+-   Carry out univariate analysis, bivariate analysis, and modelling
+
+-   Challenge the solution.
+
+-   Conclusion and recommendations
+
+e)  **Data Relevance**
+
+The dataset provided ([here](https://www.kaggle.com/datasets/teejmahal20/airline-passenger-satisfaction?select=test.csv))
+is relevant to the research question. It has relevant information on various factors that may affect a passenger's satisfaction with an airline such as ease of booking, inflight wifi services, etc.
+
+
+## Loading the dataset
+
+
+```{r}
+#loading some libraries
+library(caret)
+library(psych)
+library(Metrics)
+library(data.table)
+library(ggplot2)
+library(tidyverse)
+```
+
+
+```{r}
+#loading the dataset
+# df <- read.csv("test.csv")
+df <- read.csv("C:\\Users\\Sharon Olago\\Documents\\test.csv")
+```
+
+```{r}
+#checking the class
+class(df)
+```
+
+
+## Checking the Data
+
+Determining the no. of records in the dataset:
+
+```{r}
+dim(df)
+#the dataset has 25976 rows and 25  columns
+```
+
+Previewing the top of the dataset:
+
+```{r}
+
+head(df)
+```
+
+Previewing the bottom of the dataset:
+
+```{r}
+tail(df)
+```
+
+Checking datatype of each column:
+
+```{r}
+str(df)
+```
+
+## Tidying the Dataset
+
+```{r}
+#checking column names
+colnames(df)
+```
+
+```{r}
+#converting column names to lowercase
+colnames(df) = tolower(colnames(df))
+colnames(df)
+```
+
+```{r}
+#dropping unnecessary columns
+#dropping column X because it is an index column. Similarly, the id column just consist of unique identifications for each entry so it will be dropped too
+df <- subset(df, select=-c(x, id))
+
+#verifying that unnecessary columns were dropped
+colnames(df)
+```
+
+
+```{r}
+#checking for missing values
+colSums(is.na(df))
+```
+
+There were 83 missing values in the arrival delay in minutes column. Given that the dataset has 25976 rows, the rows with missing values in this column will be dropped.
+
+```{r}
+#dropping missing values
+df <- na.omit(df)
+```
+
+```{r}
+#verifying that the nulls have been dropped
+colSums(is.na(subset(df, select=arrival.delay.in.minutes)))
+
+#checking the dimensions of the dataset after dropping nulls
+print(dim(df))
+```
+
+```{r}
+#checking for duplicates
+nrow(df[duplicated(df),])
+
+```
+There were no duplicates 
+
+```{r}
+colnames(df)
+```
+
+
+```{r}
+#separating columns representing continuous vs categorical(nominal or ordinal) information
+
+contin = c( "departure.delay.in.minutes","arrival.delay.in.minutes", "flight.distance", "age")
+cat = c("satisfaction", "inflight.service","cleanliness","baggage.handling","checkin.service",
+        "on.board.service","leg.room.service","seat.comfort","inflight.entertainment",
+        "food.and.drink","online.boarding", "ease.of.online.booking","gate.location", "inflight.wifi.service", "departure.arrival.time.convenient", "class", "type.of.travel", "gender","customer.type")
+```
+
+```{r}
+#checking for outliers in continuous columns
+
+#function to replace period in column names with blankspace
+repl <- function(x){
+gsub(".", " ", x,fixed=TRUE)
+}
+#checking for outliers in continuous columns
+par(mfrow=c(2,2))
+for (x in contin){
+boxplot(df[x], main=repl(x), xlab=repl(x), col="blue")
+}
+```
+
+There were outliers in the departure delay in minutes,arrival delay in minutes, and flight distance columns. They will not be dropped because it is possible for the outlier delays and distances recorded to occur.
+
+```{r}
+#checking for anomalies in continuous
+
+#nrow should be zero because none of these variables should be negative
+for (x in contin){
+  print(paste(x, nrow(subset(df, df[x] < 0))))
+}
+
+#none of the variablesbelow had negative values
+```
+
+
+
+```{r}
+#checking the number of unique values in categorical(nominal and ordinal) columns
+for (x in cat){
+  print(paste(x, length(unique(df[[x]]))))
+}
+```
+
+```{r}
+#checking for anomalies in categorical
+
+for (x in cat){
+  print(x)
+  print(unique(df[[x]]))
+  
+  print("***************************************")
+}
+
+```
+
+No anomalous values observed
+
+
+## Univariate Analysis
+
+
+
+```{r}
+par(mfrow=c(2,2))
+gender <- table(df$gender)
+gender
+barplot(gender, main = 'gender', xlab = 'gender', ylab = 'count', col = 'green')
+
+customer_type <- table(df$customer.type)
+customer_type
+barplot(customer_type, main = 'customer type', xlab = 'customer type', ylab = 'count', col = 'green')
+
+type_of_travel <- table(df$type.of.travel)
+type_of_travel
+barplot(type_of_travel, main = 'travel type', xlab = 'travel type', ylab = 'count', col = 'green')
+
+class <- table(df$class)
+class
+barplot(class, main = 'class', xlab = 'class', ylab = 'count', col = 'green')
+```
+
+Most travels were for business purposes
+
+Business class most frequent, closely followed by economy
+
+Slightly more female than male passengers
+
+Most passengers were loyal customer type
+
+
+```{r}
+#countplots 
+
+par(mfrow=c(3,3))
+
+for (x in cat[2:10]){
+barplot(table(df[[x]]), col="purple", main=str_glue("Count plot of {repl(x)}",
+ xlab =repl(x), ylab="count"))
+}
+
+```
+
+For each of the features above (inflight service, cleanliness, baggage handling, checkin service, on board service, leg room service, seat comfort, and in flight entertainment), the most frequent rating was 4
+
+```{r}
+par(mfrow=c(3,2))
+
+for (x in cat[11:15]){
+barplot(table(df[[x]]), col="purple", main=str_glue("Count plot of {repl(x)}",
+ xlab =repl(x), ylab="count"))
+}
+```
+
+Most frequent rating for:
+- online boarding - 4
+
+- ease of online booking - 2
+
+- gate location - 3
+
+- in flight wifi service - 2
+
+- covenience of arrival and departure time - 4
+
+
+```{r}
+#target column
+barplot(table(df$satisfaction), col="purple", main=str_glue("Count plot of satisfaction"),
+ xlab ="satisfaction", ylab="count")
+```
+
+There were more neutral/dissatisfied customers than satisfied passengers.
+
+
+```{r}
+par(mfrow = c(2,2))
+hist(df$flight.distance, main = 'flight distance', xlab = 'flight distance', col = 'green')
+hist(df$departure.delay.in.minutes, main = 'departure delay', xlab = 'departure delay(minutes)', col = 'green')
+hist(df$age, main ='Age', col = 'green', xlab = 'age')
+hist(df$arrival.delay.in.minutes, main = 'arrival delay', xlab = 'arrival delay(minutes)', col = 'green')
+```
+
+Most delays were less than 100 minutes
+
+Most flight distances fell in the 0 to 500 bin.
+
+Most passengers were between 20 and 60 years old
+
+```{r}
+#statistical summaries of these continuous variables:
+for (x in contin){
+  print(describe(df[x]))
+  
+}
+```
+
+
+
+
+## Bivariate Analysis
+
+Target column is "satisfaction" - the overall satisfaction with the airline, either satisfied or neutral/dissatisfied
+
+```{r}
+
+cols <- c("online.boarding", "inflight.wifi.service", "seat.comfort", "type.of.travel")
+
+#satisfaction 
+for (col in cols){
+print(ggplot() + geom_bar(
+ data=df,
+ aes(x=factor(df[[col]]), fill = factor(satisfaction)
+ ), position="dodge") + labs(title = str_glue("Overall satisfaction by {repl(col)}"),
+ y="count", x=repl(col), fill="satisfaction") + theme(plot.title =
+element_text(hjust=0.5)))
+}
+
+```
+
+
+The proportion of those whose overall satisfaction level was "satisfied" was higher than that of neutral/dissatisfied among those who gave online boarding, inflight wifi service, and seat comfort ratings of 4 or 5. 
+
+Most people travelling for business purposes were overall satisfied with the airline while most personal travellers were dissatisfied or neutral.
+
+
+```{r}
+
+cols <- c("ease.of.online.booking", "inflight.entertainment", "class", "customer.type")
+
+#satisfaction 
+for (col in cols){
+print(ggplot() + geom_bar(
+ data=df,
+ aes(x=factor(df[[col]]), fill = factor(satisfaction)
+ ), position="dodge") + labs(title = str_glue("Overall satisfaction by {repl(col)}"),
+ y="count", x=repl(col), fill="satisfaction") + theme(plot.title =
+element_text(hjust=0.5)))
+}
+
+```
+
+
+Observations:
+
+The proportion of those whose overall satisfaction level was "satisfied" was higher than that of neutral/dissatisfied among those who gave inflight entertainment and ease of online booking ratings of 4 or 5. 
+
+
+Most in business class were satisfied with the airline.
+
+The proportion of loyal customers satisfied is greater than the proportion of disloyal who are satisfied.
+
+
+```{r}
+#plotting age and flight distance
+par(mfrow=c(1,2))
+m = df %>% dplyr::group_by(satisfaction) %>%
+dplyr::summarise(mean=mean(age))
+ggplot() + geom_col(
+data=m,
+aes(x=as.factor(satisfaction), y=mean),
+fill="orange") + labs(title = "Average age by satisfaction",
+y="mean age", x="satisfaction") + theme(plot.title = element_text(hjust=0.5))
+
+m = df %>% dplyr::group_by(satisfaction) %>%
+dplyr::summarise(mean=mean(departure.delay.in.minutes))
+ggplot() + geom_col(
+data=m,
+aes(x=as.factor(satisfaction), y=mean),
+fill="purple") + labs(title = "Average departure delay in minutes by satisfaction",
+y="mean departure delay in minutes", x="satisfaction") + theme(plot.title = element_text(hjust=0.5))
+```
+
+
+Mean age among those satisfied was higher.
+
+The mean departure delay in minutes experienced was higher among neutral/dissatisfied customers than satisfied customers.
+
+
+
+
+```{r}
+#checking for variables with character type to convert to numerical for further analysis
+str(df)
+```
+
+```{r}
+library(superml)
+```
+
+
+```{r}
+#converting categorical to numerical
+vars <- c("gender", "customer.type", "type.of.travel","class", "satisfaction")
+
+#creating a copy of the dataframe
+enc_df <- copy(df)
+
+#creating an instance of the label encoder
+enc <- LabelEncoder$new()
+
+#encoding
+
+for (var in vars){
+  enc_df[[var]] <- enc$fit_transform(factor(enc_df[[var]]))
+
+}
+
+
+
+#checking char have been converted to numerical
+str(enc_df)
+```
+
+```{r}
+library(reshape2)
+```
+
+
+Plotting heatmap
+```{r}
+#plotting the correlation heatmap
+datam = melt(round(cor(enc_df),2))
+ggplot(data=datam, aes(x=Var1, y=Var2, fill=value)) + geom_tile() + geom_text(aes(Var2, Var1, label=value), color="black",size=2) + theme(axis.text.x=element_text(angle=90,vjust=0.5,hjust=1), axis.title.x = element_blank(), axis.title.y = element_blank())
+```
+According to the matrix, satisfaction appears most correlated to online boarding, type of travel, and class. Modelling will reveal more on the relationships between the predictors and level of passenger satisfaction.
+
+
+
+
+
+```{r}
+table(df$satisfaction)
+table(enc_df$satisfaction)
+#the "positive" class is satisfied
+
+#there is some imbalance
+```
+
+
+
+
+## Modelling
+
+Splitting to test and train
+```{r}
+#stratified 70-30 train test split
+set.seed(0)
+train <- createDataPartition(enc_df$satisfaction, p=.7, list=FALSE)
+# training set
+st_train <- enc_df[train,]
+# test set
+st_test <- enc_df[-train,]
+
+#X and y train and test
+X_train <- subset(st_train, select=-satisfaction)
+y_train <- subset(st_train, select=satisfaction)
+X_test <- subset(st_test, select=-satisfaction)
+y_test <- subset(st_test, select=satisfaction)
+```
+
+```{r}
+#function calculating accuracy, precision, recall, and f1
+
+pred_metrics <- function(met, t){
+  if(met=="precision"){
+        p = (t[2,2] / (t[2,2] + t[1,2]))
+        p  = round(p, 4)
+        paste0('The precision is: ', p)
+  }
+  else if(met=="f1"){
+        p = (t[2,2] / (t[2,2] + t[1,2]))
+        s = t[2,2] / (t[2,2] + t[2,1])
+        f1 = (2*p*s) / (p + s)
+        f1 = round(f1, 4)
+        paste0("The F1 score is: ", f1)
+  }
+  else if(met=="recall"){
+        r  = t[2,2] / (t[2,2] + t[2,1])
+        r  = round(r,4)
+        paste0('The sensitivity(recall) is: ',r)
+  }
+  else{
+        accuracy = (t[2,2] + t[1,1]) / (t[2,2] + t[1,2] + t[1,1] + t[2,1])
+        accuracy = round(accuracy, 4)
+        paste0("The prediction accuracy is: ", accuracy)
+  }
+}
+
+```
+
+### Rpart (Decision trees)
+
+```{r}
+#loading required packages
+library(rpart.plot)
+
+library(rpart)
+```
+
+```{r}
+library(rattle)
+```
+
+
+
+```{r}
+#fitting the model
+
+# setting seed for reproducibility
+set.seed(100)
+
+#cross validation is done by default 
+m <- rpart(satisfaction ~ ., data = st_train,
+ method = "class")
+
+```
+
+```{r}
+#plotting tree
+rpart.plot(m, main="Decision tree")
+# fancyRpartPlot(m, main="Decision tree", sub="decision tree")
+```
+
+
+```{r}
+#complexity parameter values during rpart
+m$call
+m$cptable
+```
+
+F1 will be the metric being optimised, as a good balance between precision and recall is being sought on slightly imbalanced data.
+
+```{r}
+f1_list <- list()
+```
+
+
+
+```{r}
+
+#predicting and confusion matrix
+predictions <- predict(m, X_test, type = "class")
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('Rpart 1: {pred_metrics("f1", t)}'))
+```
+
+```{r}
+#f1_list<-append(f1_list, str_glue('Rpart 1: {pred_metrics("f1", t)}'))
+f1_list
+```
+
+
+```{r}
+#more detailed evaluation. recall, specificty etc verified 
+caret::confusionMatrix(data=as.factor(p), reference=as.factor(y_test[,]), 
+positive="1")
+```
+
+```{r}
+
+#plotting cp (complexity parameter) values and the size of tree they correspond to,
+#against error
+plotcp(m)
+```
+
+```{r}
+m$cptable
+```
+
+
+
+
+Challenging the solution
+
+```{r}
+library(MLmetrics)
+```
+
+
+```{r}
+
+
+#target column should be factor when using train function
+st_train$satisfaction <- factor(st_train$satisfaction)
+
+#creating custom f1 function to use as metric to optimise
+f1 <- function(data, lev = NULL, model = NULL) {
+        f1_val <- MLmetrics::F1_Score(y_pred = data$pred,
+                                      y_true = data$obs,
+                                      positive = lev[1])
+        c(F1 = f1_val)
+}
+
+set.seed(100)
+model <- train(satisfaction ~ .,
+ data = st_train,
+ method = "rpart",
+ tuneLength = 10,
+ metric = "F1",
+ trControl = trainControl(method = "cv",number = 5,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE))
+# model
+## CAR
+```
+
+```{r}
+model
+```
+
+
+```{r}
+#predicting and confusion matrix
+predictions <- predict(model, X_test)
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('Rpart 2: {pred_metrics("f1", t)}'))
+```
+
+```{r}
+#more detailed evaluation
+# caret::confusionMatrix(data=as.factor(predictions), reference=as.factor(y_test[,]), 
+# positive="1")
+```
+
+
+
+
+```{r}
+f1_list[1:2]
+```
+
+There was an improvement in the f1 to 91.3% for the model formed when using the train function, with the tune length set to 10 and 5 fold cross validation.
+
+
+### Ranger (Random forests)
+
+
+
+```{r}
+set.seed(100)
+rfmodel <- train(satisfaction ~ .,
+ data = st_train,
+ method = "ranger",
+ metric = "F1",
+ trControl = trainControl(method = "cv",number = 5,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE)) 
+rfmodel
+```
+```{r}
+#predicting and confusion matrix
+predictions <- predict(rfmodel, X_test)
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('Ranger 1: {pred_metrics("f1", t)}'))
+```
+```{r}
+
+f1_list
+```
+
+
+
+
+First ranger model is the best performing across all metrics so far.
+
+Challenging the solution
+
+```{r}
+#tuning min node size as well
+grid <- expand.grid(.mtry = c(2,12,22),
+ .splitrule = c("gini", "extratrees"),
+ .min.node.size = c(1, 5, 10, 15,20)
+ 
+ )
+
+set.seed(100)
+
+
+rfmodel2 <- train(satisfaction ~ .,
+ data = st_train,
+ method = "ranger",
+ metric = "F1",
+ tuneGrid = grid,
+ importance = "impurity",
+ trControl = trainControl(method = "cv",number = 5,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE)) 
+#rfmodel2
+```
+
+```{r}
+rfmodel2
+```
+
+
+
+```{r}
+
+#predicting and confusion matrix
+predictions <- predict(rfmodel2, X_test)
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('Ranger 2: {pred_metrics("f1", t)}'))
+```
+
+```{r}
+#more detailed evaluation
+# caret::confusionMatrix(data=as.factor(predictions), reference=as.factor(y_test[,]), 
+# positive="1")
+```
+
+
+```{r}
+f1_list
+```
+
+The ranger model 2 with mtry = 12, splitrule = extratrees, and min.node.size = 10 is now the best performing so far, not only f1 but in accuracy,precision and recall as well.
+
+### KNN
+
+
+
+```{r}
+#scaling the features
+
+#transforming test based on values obtained from train (scaler should only be 
+# fitted on train set then used to transform both train and test to prevent 
+# data leakage caused by fitting on entire dataset)
+
+#obtaining means and standard deviations
+m <- colMeans(st_train[1:22])
+s <- apply(st_train[1:22], 2, sd)
+
+#creating copies of training and test, scaling the features
+st_train_sc <- copy(st_train)
+st_test_sc <- copy(st_test)
+
+st_train_sc[1:22] <- scale(st_train[1:22], center = m, scale = s)
+st_test_sc[1:22] <- scale(st_test[1:22], center = m, scale = s)
+
+```
+
+
+
+
+```{r}
+library(class)
+```
+
+
+```{r}
+#arbitrary value of 5(odd) as initial k 
+set.seed(100)
+knnpred1 <- knn(train= subset(st_train_sc, select=-satisfaction),test=subset(st_test_sc, select=-satisfaction), cl= st_train_sc$satisfaction, k=5)
+
+```
+
+```{r}
+
+#predicting and confusion matrix
+# predictions <- predict(rfmodel, X_test)
+t <- table(y_test$satisfaction,knnpred1)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('Knn 1: {pred_metrics("f1", t)}'))
+```
+
+
+```{r}
+f1_list
+```
+
+The knn is performing well but is not the best model
+
+```{r}
+#k as square root of n
+set.seed(100)
+kpred1 <- knn(train= subset(st_train_sc, select=-satisfaction),test=subset(st_test_sc, select=-satisfaction), cl= st_train_sc$satisfaction, k=trunc(sqrt(18126)))
+```
+
+
+
+```{r}
+#k as root n
+#predicting and confusion matrix
+# predictions <- predict(rfmodel, X_test)
+t <- table(y_test$satisfaction,kpred1)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('Knn 2: {pred_metrics("f1", t)}'))
+```
+
+```{r}
+f1_list
+```
+
+Using k as square root of n gives lower metric scores than k as 5
+
+
+```{r}
+#setting seed for reproducibility
+ set.seed(100)
+
+knnmod2 <- train(satisfaction ~ ., data = st_train_sc,
+ method= "knn", trControl = trainControl(method = "cv",number = 5,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE),
+ tuneLength= 10, metric="F1")
+knnmod2
+```
+
+
+```{r}
+#model above. 
+#predicting and confusion matrix
+predictions <- predict(knnmod2, subset(st_test_sc, select=-satisfaction))
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+
+```
+
+```{r}
+f1_list<-append(f1_list, str_glue('Knn 3: {pred_metrics("f1", t)}'))
+f1_list 
+```
+
+The knn model with the train function k=9 is the best knn model with an f1 of 0.9059, but not better than the random forest model 2 with F1 of 0.9536 which is the best so far
+
+
+
+
+
+###  SVM
+
+
+
+
+```{r}
+# Fit the model on scaled features, linear kernel, tuning param
+set.seed(100)
+svml <- train(satisfaction ~ ., data = st_train_sc,
+ method= "svmLinear", trControl = trainControl(method = "cv",number = 5,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE), metric="F1", tuneGrid = expand.grid(C = seq(0, 2, length = 10)))
+#View the model
+svml
+```
+
+```{r}
+#predicting and confusion matrix
+predictions <- predict(svml, subset(st_test_sc, select=-satisfaction))
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('svm linear t: {pred_metrics("f1", t)}'))
+```
+
+```{r}
+f1_list
+```
+
+Linear svm has lowest f1 out of all the models tested so far
+
+
+
+
+
+```{r}
+# Fit the model on scaled features, polynomial kernel
+
+set.seed(100)
+
+svmp <- train(satisfaction ~ ., data = st_train_sc, method = "svmPoly", trControl = trainControl(method = "cv",number = 3,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE), metric="F1", tuneLength = 3)
+#View the model
+svmp
+```
+
+```{r}
+#predicting and confusion matrix
+predictions <- predict(svmp, subset(st_test_sc, select=-satisfaction))
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('svm polynomial t: {pred_metrics("f1", t)}'))
+```
+
+```{r}
+f1_list
+```
+
+This svm model with a polynomial kernel has a high F1 score of 0.9402 but this is lower than the benchmark of 0.9536 by the random forest model 2.
+
+```{r}
+# Fit the model on scaled features, radial basis function kernel
+set.seed(100)
+
+svmr <- train(satisfaction ~ ., data = st_train_sc, method = "svmRadial", trControl = trainControl(method = "cv",number = 3,summaryFunction = f1, search = "grid"
+ ,verboseIter = FALSE), metric="F1", tuneLength = 3)
+#View the model
+svmr
+```
+
+
+
+```{r}
+#predicting and confusion matrix
+predictions <- predict(svmr, subset(st_test_sc, select=-satisfaction))
+t <- table(y_test$satisfaction,predictions)
+t
+
+for (val in c("precision", "f1", "recall", "accuracy")){
+  print(pred_metrics(val, t))
+}
+f1_list<-append(f1_list, str_glue('svm radial t: {pred_metrics("f1", t)}'))
+```
+
+
+```{r}
+f1_list
+```
+The radial basis function kernel svm model is second best among the support vector models tested, and lower than the benchamrk random forest model.
+
+
+### Feature importance
+
+The best model was determined to be random forest model 2 (built with ranger), with an f1-score of 0.9536. Other metrics were high as well (precision - 0.9641, recall - 0.9432, accuracy - 0.9596). Feature importances can be extracted from this model
+
+```{r}
+
+varImp(rfmodel2)
+```
+
+
+
+
+```{r}
+#graph highlighting the bove
+df_vars <- data.frame(m$variable.importance)
+
+par(mar= c(10.1,4.1,4.1,2.1))
+
+barplot(varImp(rfmodel2)$importance$Overall, names=rownames(varImp(rfmodel2)$importance), las=2, col="blue", main="Variable importance"
+, ylab="importance")
+```
+
+
+
+### Modelling summary
+The models tested were built applying 4 types of classifiers:
+
+- Decision trees (rpart)
+
+- Random forests (ranger)
+
+- Support vector machines
+
+- K-Nearest-Neighbors 
+
+
+The main metric that was being optimized was the f1-score, because a good balance between precision and recall was being sought, that is, minimising both false positives and negatives. Feature scaling was done before using KNN and SVM. Train-test split of 70-30.
+
+
+Decision trees:
+
+1. The first model gave an F1 score of  0.8831
+
+2. Tuning the cp (complexity parameter), f1 improved to 0.9139
+
+
+Random forests:
+
+1. The first model - mtry and splitrule were tuned. F1 of 0.9529 was obtained 
+
+2. The two above and min node size additionally were tuned, giving F1 of 0.9536-benchmark 
+
+
+K-nearest neighbour: 
+
+1. Initially, an arbitrary odd value (because we have 2 classes) of k as 5 was used. F1 was 0.9052. 
+
+2. Using k as the square root of training sample size, f1 was 0.8774
+
+3. Tuning k further resulted in identification of k as  9. That model gave F1 of 0.9059
+
+
+
+SVM
+
+1. Linear kernel - Tuning the c parameter. Model gave F1 of 0.8583
+
+2. Polynomial kernel - tuning degree of model (3). Model gave F1-0.9402
+
+3. Rbf kernel - tuning c, sigma constant. F1-0.9362
+
+
+Best model - random forest with mtry =12, split rule =extra trees, min.node.size =10: F1 0.9536
+
+
+
+## Conclusion
+
+Conclusion
+
+The main objectives of the project were achieved:
+
+a) A model that can predict a passenger’s level of satisfaction with high accuracy was built (Best model - a random forest model giving F1 - 0.9536, as well as high values for other metrics (precision : 0.9641, recall: 0.9432,accuracy: 0.9596"))
+
+
+b) The top factors affecting a passenger’s overall satisfaction level with an airline were identified: (highlighting top 10 respectively) inflight wifi service, online boarding, type of travel, class, customer type, inflight entertainment, seat comfort, ease of online booking, baggage handling, and checkin service.
+
+
+c) The relationships between overall level of satisfaction and various predictor variables were determined. Some insights:
+- The proportion of those whose overall satisfaction level was "satisfied" was higher than that of neutral/dissatisfied among those who gave online boarding, inflight wifi service, seat comfort, inflight entertainment and ease of online booking ratings of 4 or 5. 
+- Most people travelling for business purposes were overall satisfied with the airline while most personal travellers were dissatisfied or neutral.
+- Most in business class were satisfied with the airline as opposed to economy and economy plus where most were dissatified/neutral.
+
+
+## Recommendations
+
+Recommendations based on some of the top features:
+
+- Airlines should improve the quality and availability of their in flight wifi service to improve overall passenger satisfaction with their airline.
+
+- Customer type. Advertising and encouraging passengers to join loyalty programs and experience perks such as gaining redeemable miles, deals with travel destination accommodation etc, will be beneficial because these programs are likely to increase passenger satisfaction with the airline overall. Customer retention also boosts revenue.
+
+- Online boarding. Checking in online allows passengers to check in in advance, choose their seat, and print their boarding pass. They can therefore avoid the long queues in the airport. A smooth process in doing this improves the passenger experience.
+
+- Airlines should diversify the available selections on their inflight entertainment platforms, such as movies, music, etc to increase the likelihood of a passenger finding something enjoyable.
+
+- Airlines should upgrade the quality of their seats when necessary (for example those that are hard, worn and torn) to maximize on improving comfort for the passengers. 
+
+- Ease of online booking was also determined to be an important factor. Airlines should ensure that their online platforms are user-friendly, straightforward and up-to-date when it comes to booking.
+
+- Baggage handling is also a top 10 factor in determining passenger satisfaction. Airlines should ensure that their systems are well-coordinated to avoid cases of delays/loss/damage to baggage.
+
+- The staff at the physical airline check in stations in airports should have good customer service skills, as the impression they make affects overall passenger satisfaction with the airline.
+
+
+
+
+
