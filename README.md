@@ -15,7 +15,7 @@ Build a model that can predict a passenger’s satisfaction with an airline.
 
 ## Running the apps
 *  Access the R markdown file in [this repository](https://github.com/TabithaWKariuki/Airline-Satisfaction)
-
+*  Access the html file hosted online [here](https://sharon-faith.github.io/air-satis-online/) 
 
 ## Installation/ Set Up
 * Use a desktop or laptop, phone or tablet.
